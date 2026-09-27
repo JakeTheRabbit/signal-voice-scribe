@@ -1,6 +1,6 @@
 [project]
 name = "signal-scribe"
-version = "1.0.0"
+version = "1.0.1"
 description = "Read your Signal voice notes instead of listening to them. Private, on-device transcription."
 readme = "README.md"
 license = "MIT"

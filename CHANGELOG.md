@@ -2,6 +2,18 @@
 
 All notable changes to Signal Scribe. This project follows [semantic versioning](https://semver.org/).
 
+## [1.0.1] - 2026-09-28
+
+### Fixed
+- Linux: the desktop app couldn't start its background service ("The background service returned
+  an invalid response"): the AppImage's Python settings leaked into it. Programs the app starts
+  now get a clean environment.
+- Linux: if the computer lacks graphics or font libraries the app needs, the installer names them
+  and sets up headless mode instead of installing an app that can't open (see Troubleshooting).
+- Linux: switching between the desktop app and headless mode by re-running the installer no longer
+  leaves both starting at login.
+- `SHA256SUMS.txt` can no longer list itself.
+
 ## [1.0.0] - 2026-09-28
 
 First public release.

@@ -1,6 +1,6 @@
 [package]
 name = "signal-scribe"
-version = "1.0.0"
+version = "1.0.1"
 description = "Read your Signal voice notes instead of listening to them"
 authors = ["Signal Scribe contributors"]
 license = "MIT"
