@@ -120,3 +120,34 @@ jobs:
           else
             gh release create "$TAG" out/* --title "Signal Scribe ${TAG#v}" --notes-file notes.md --verify-tag
           fi
+
+  verify:
+    name: Install the published app (${{ matrix.os }})
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Install with the desktop app from this release (Windows)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          .\install.ps1 -Model none -NoAutostart -NoShortcuts -NoLaunch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Test-Path runtime\desktop\signal-scribe.exe)) { throw "desktop app missing" }
+      - name: Install with the desktop app from this release (macOS, Linux)
+        if: runner.os != 'Windows'
+        run: |
+          ./install.sh --model none --no-autostart --no-shortcuts --no-launch
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            test -x "$HOME/Applications/Signal Scribe.app/Contents/MacOS/signal-scribe"
+          else
+            test -x runtime/desktop/app/AppRun
+          fi
