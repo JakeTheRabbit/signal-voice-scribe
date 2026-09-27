@@ -317,7 +317,7 @@ pub fn run() {
             } else if let Some(icon) = app.default_window_icon() {
                 tray = tray.icon(icon.clone());
             }
-            tray.on_menu_event(|app, event| match event.id.as_ref() {
+            let tray = tray.on_menu_event(|app, event| match event.id.as_ref() {
                 "show" => show_window(app),
                 "start" => tray_engine_action(app, "start"),
                 "stop" => tray_engine_action(app, "stop"),
@@ -333,8 +333,12 @@ pub fn run() {
                 {
                     show_window(tray.app_handle());
                 }
-            })
-            .build(app)?;
+            });
+            if tray.build(app).is_err() {
+                // Some Linux desktops have no tray. Keep the window reachable instead of
+                // failing to start; opening the app again brings the window back.
+                show_window(app.handle());
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

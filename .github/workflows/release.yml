@@ -122,7 +122,7 @@ jobs:
           fi
 
   verify:
-    name: Install the published app (${{ matrix.os }})
+    name: Install and launch the published app (${{ matrix.os }})
     needs: publish
     strategy:
       fail-fast: false
@@ -141,13 +141,30 @@ jobs:
         run: |
           .\install.ps1 -Model none -NoAutostart -NoShortcuts -NoLaunch
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          if (-not (Test-Path runtime\desktop\signal-scribe.exe)) { throw "desktop app missing" }
+      - name: Launch it (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $app = Start-Process runtime\desktop\signal-scribe.exe -ArgumentList '--root', "$PWD" -PassThru
+          Start-Sleep -Seconds 20
+          if ($app.HasExited) { throw "the app exited early (code $($app.ExitCode))" }
+          $control = Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*control_server.py*' }
+          if (-not $control) { throw "the app did not start its background service" }
+          Stop-Process -Id $app.Id -Force
       - name: Install with the desktop app from this release (macOS, Linux)
         if: runner.os != 'Windows'
+        run: ./install.sh --model none --no-autostart --no-shortcuts --no-launch
+      - name: Launch it (macOS, Linux)
+        if: runner.os != 'Windows'
         run: |
-          ./install.sh --model none --no-autostart --no-shortcuts --no-launch
           if [ "$RUNNER_OS" = "macOS" ]; then
-            test -x "$HOME/Applications/Signal Scribe.app/Contents/MacOS/signal-scribe"
+            "$HOME/Applications/Signal Scribe.app/Contents/MacOS/signal-scribe" --root "$PWD" &
           else
-            test -x runtime/desktop/app/AppRun
+            sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
+            xvfb-run -a runtime/desktop/app/AppRun --root "$PWD" &
           fi
+          app=$!
+          sleep 20
+          kill -0 "$app" || { echo "the app exited early"; exit 1; }
+          pgrep -f control_server.py || { echo "the app did not start its background service"; exit 1; }
+          kill "$app"
