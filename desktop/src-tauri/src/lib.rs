@@ -210,7 +210,7 @@ async fn open_logs(state: Managed<'_>) -> Result<(), DesktopError> {
         } else {
             "xdg-open"
         };
-        std::process::Command::new(opener)
+        crate::process::outside_appimage(&mut std::process::Command::new(opener))
             .arg(&logs)
             .spawn()
             .map(|_| ())

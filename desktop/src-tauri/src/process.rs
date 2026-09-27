@@ -6,6 +6,44 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::time::{Duration, Instant};
 
+/// Environment changes that undo an AppImage's AppRun for a child process: every entry it
+/// added under `appdir` (PYTHONHOME, PYTHONPATH, LD_LIBRARY_PATH, PATH, the GTK variables…)
+/// goes, and so does its PYTHONDONTWRITEBYTECODE. `None` removes the variable.
+fn leave_appimage(
+    appdir: &Path,
+    vars: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Vec<(OsString, Option<OsString>)> {
+    let mut changes = vec![(OsString::from("PYTHONDONTWRITEBYTECODE"), None)];
+    for (key, value) in vars {
+        let entries: Vec<PathBuf> = std::env::split_paths(&value).collect();
+        if !entries.iter().any(|entry| entry.starts_with(appdir)) {
+            continue;
+        }
+        let kept = entries
+            .into_iter()
+            .filter(|entry| !entry.as_os_str().is_empty() && !entry.starts_with(appdir));
+        let joined = std::env::join_paths(kept)
+            .ok()
+            .filter(|joined| !joined.is_empty());
+        changes.push((key, joined));
+    }
+    changes
+}
+
+/// Give `command` the environment it would have outside the AppImage (no-op elsewhere).
+/// Otherwise Python finds the bundle's PYTHONHOME instead of its own standard library.
+pub fn outside_appimage(command: &mut Command) -> &mut Command {
+    if let Some(appdir) = std::env::var_os("APPDIR") {
+        for (key, value) in leave_appimage(Path::new(&appdir), std::env::vars_os()) {
+            match value {
+                Some(value) => command.env(key, value),
+                None => command.env_remove(key),
+            };
+        }
+    }
+    command
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Pipes {
     /// No pipes (the link helper).
@@ -38,7 +76,7 @@ impl ProcessSpec {
     }
     pub fn spawn(&self, pipes: Pipes) -> Result<ProcessTree, DesktopError> {
         let mut command = Command::new(&self.program);
-        command
+        outside_appimage(&mut command)
             .args(&self.args)
             .current_dir(&self.cwd)
             .env("PYTHONUNBUFFERED", "1")
@@ -147,6 +185,47 @@ impl ProcessTree {
 impl Drop for ProcessTree {
     fn drop(&mut self) {
         let _ = self.terminate();
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn children_leave_the_appimage_environment() {
+        let vars = [
+            ("PYTHONHOME", "/apps/scribe/app/usr/"),
+            ("PYTHONPATH", "/apps/scribe/app/usr/share/pyshared/:"),
+            ("PATH", "/apps/scribe/app/usr/bin/:/usr/local/bin:/usr/bin"),
+            (
+                "LD_LIBRARY_PATH",
+                "/apps/scribe/app/usr/lib/:/apps/scribe/app//usr/lib64",
+            ),
+            ("GTK_THEME", "Adwaita:light"),
+            ("HOME", "/home/user"),
+            ("NEIGHBOUR", "/apps/scribe/app-2/usr"),
+        ]
+        .map(|(key, value)| (OsString::from(key), OsString::from(value)));
+        let changes = leave_appimage(Path::new("/apps/scribe/app"), vars);
+        let change = |key: &str| {
+            changes
+                .iter()
+                .find(|(k, _)| k == key)
+                .map(|(_, value)| value.clone())
+        };
+        for removed in [
+            "PYTHONHOME",
+            "PYTHONPATH",
+            "LD_LIBRARY_PATH",
+            "PYTHONDONTWRITEBYTECODE",
+        ] {
+            assert_eq!(change(removed), Some(None), "{removed}");
+        }
+        assert_eq!(change("PATH"), Some(Some("/usr/local/bin:/usr/bin".into())));
+        for untouched in ["GTK_THEME", "HOME", "NEIGHBOUR"] {
+            assert_eq!(change(untouched), None, "{untouched}");
+        }
     }
 }
 
