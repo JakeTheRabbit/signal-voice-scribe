@@ -61,27 +61,25 @@ if ($running.Count -gt 0) {
 }
 
 # 1. uv: a single-file Python installer and package manager (https://docs.astral.sh/uv/).
-$uv = $null
-$existing = Get-Command uv -ErrorAction SilentlyContinue
-if ($existing) { $uv = $existing.Source }
-if (-not $uv) {
+# The pinned copy is used even if you have uv, so it always matches the lockfile.
+$uvDir = Join-Path $Runtime 'uv'
+$uv = Join-Path $uvDir 'uv.exe'
+$uvCurrent = $null
+if (Test-Path -LiteralPath $uv) { $uvCurrent = ((& $uv --version) -split ' ')[1] }
+if ($uvCurrent -ne $UvVersion) {
     $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
-    $uvDir = Join-Path $Runtime 'uv'
-    $uv = Join-Path $uvDir 'uv.exe'
-    if (-not (Test-Path -LiteralPath $uv)) {
-        Write-Host "Downloading uv $UvVersion..."
-        New-Item -ItemType Directory -Force -Path $uvDir | Out-Null
-        $zip = Join-Path $uvDir 'uv.zip'
-        $url = "https://github.com/astral-sh/uv/releases/download/$UvVersion/uv-$arch-pc-windows-msvc.zip"
-        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
-        $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-        if ($hash -ne $UvHashes[$arch]) {
-            Remove-Item -LiteralPath $zip -Force
-            throw "The uv download failed its checksum and was deleted. Try again."
-        }
-        Expand-Archive -LiteralPath $zip -DestinationPath $uvDir -Force
+    Write-Host "Downloading uv $UvVersion..."
+    New-Item -ItemType Directory -Force -Path $uvDir | Out-Null
+    $zip = Join-Path $uvDir 'uv.zip'
+    $url = "https://github.com/astral-sh/uv/releases/download/$UvVersion/uv-$arch-pc-windows-msvc.zip"
+    Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+    $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $UvHashes[$arch]) {
         Remove-Item -LiteralPath $zip -Force
+        throw "The uv download failed its checksum and was deleted. Try again."
     }
+    Expand-Archive -LiteralPath $zip -DestinationPath $uvDir -Force
+    Remove-Item -LiteralPath $zip -Force
 }
 
 # 2. Python 3.12 and packages, kept inside this folder.

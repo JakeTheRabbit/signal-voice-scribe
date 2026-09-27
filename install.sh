@@ -66,30 +66,28 @@ fetch() {
 }
 
 # 1. uv: a single-file Python installer and package manager (https://docs.astral.sh/uv/).
-UV="$(command -v uv || true)"
-if [ -z "$UV" ]; then
-    UV="$RUNTIME/uv/uv"
-    if [ ! -x "$UV" ]; then
-        case "$(uname -s)-$(uname -m)" in
-            Darwin-arm64)   TARGET="aarch64-apple-darwin";      HASH="a9a8df1eedeb192f2e47e40e2faabfb387db4b850209118786d42f89dde3e0ba" ;;
-            Darwin-x86_64)  TARGET="x86_64-apple-darwin";       HASH="cb5fa57bafe68fc0fb94b17f06bee0b0b9a7feb94ccbd110445afa0696e39273" ;;
-            Linux-x86_64)   TARGET="x86_64-unknown-linux-gnu";  HASH="23bf5552d220e0842b65c862097b2ebaeba0064b74eda5e565e77fd25969d8c8" ;;
-            Linux-aarch64|Linux-arm64)
-                            TARGET="aarch64-unknown-linux-gnu"; HASH="0804e9b164c64b6914182d5920c08551958a095986f10a3731056df701126436" ;;
-            *) echo "Unsupported system: $(uname -s) $(uname -m)" >&2; exit 1 ;;
-        esac
-        echo "Downloading uv $UV_VERSION..."
-        mkdir -p "$RUNTIME/uv"
-        ARCHIVE="$RUNTIME/uv/uv.tar.gz"
-        fetch "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$TARGET.tar.gz" "$ARCHIVE"
-        if [ "$(sha256_of "$ARCHIVE")" != "$HASH" ]; then
-            rm -f "$ARCHIVE"
-            echo "The uv download failed its checksum and was deleted. Try again." >&2
-            exit 1
-        fi
-        tar -xzf "$ARCHIVE" -C "$RUNTIME/uv" --strip-components=1
+# The pinned copy is used even if you have uv, so it always matches the lockfile.
+UV="$RUNTIME/uv/uv"
+if [ ! -x "$UV" ] || [ "$("$UV" --version 2>/dev/null | cut -d' ' -f2)" != "$UV_VERSION" ]; then
+    case "$(uname -s)-$(uname -m)" in
+        Darwin-arm64)   TARGET="aarch64-apple-darwin";      HASH="a9a8df1eedeb192f2e47e40e2faabfb387db4b850209118786d42f89dde3e0ba" ;;
+        Darwin-x86_64)  TARGET="x86_64-apple-darwin";       HASH="cb5fa57bafe68fc0fb94b17f06bee0b0b9a7feb94ccbd110445afa0696e39273" ;;
+        Linux-x86_64)   TARGET="x86_64-unknown-linux-gnu";  HASH="23bf5552d220e0842b65c862097b2ebaeba0064b74eda5e565e77fd25969d8c8" ;;
+        Linux-aarch64|Linux-arm64)
+                        TARGET="aarch64-unknown-linux-gnu"; HASH="0804e9b164c64b6914182d5920c08551958a095986f10a3731056df701126436" ;;
+        *) echo "Unsupported system: $(uname -s) $(uname -m)" >&2; exit 1 ;;
+    esac
+    echo "Downloading uv $UV_VERSION..."
+    mkdir -p "$RUNTIME/uv"
+    ARCHIVE="$RUNTIME/uv/uv.tar.gz"
+    fetch "https://github.com/astral-sh/uv/releases/download/$UV_VERSION/uv-$TARGET.tar.gz" "$ARCHIVE"
+    if [ "$(sha256_of "$ARCHIVE")" != "$HASH" ]; then
         rm -f "$ARCHIVE"
+        echo "The uv download failed its checksum and was deleted. Try again." >&2
+        exit 1
     fi
+    tar -xzf "$ARCHIVE" -C "$RUNTIME/uv" --strip-components=1
+    rm -f "$ARCHIVE"
 fi
 
 # 2. Python 3.12 and packages, kept inside this folder.
