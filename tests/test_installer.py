@@ -128,3 +128,27 @@ def test_mac_launch_agent(monkeypatch, tmp_path):
     assert plistlib.loads(agent.read_bytes())["ProgramArguments"] == target.command
     autostart.set_enabled(False, None)
     assert not agent.exists()
+
+
+@pytest.mark.parametrize("text, owner, expected", [
+    (r'"C:\Apps\scribe\runtime\desktop\signal-scribe.exe" --root C:\Apps\scribe --hidden', r"C:\Apps\scribe", True),
+    (r'"C:\Apps\scribe-2\runtime\desktop\signal-scribe.exe" --root C:\Apps\scribe-2', r"C:\Apps\scribe", False),
+    ('/home/user/signal scribe/app/AppRun --root "/home/user/signal scribe"', "/home/user/signal scribe", True),
+    (r"pythonw.exe C:\Github\signal-scribe\app.py", r"C:\Github\signal-voice-scribe", False),
+    (None, "/opt/scribe", False),
+])
+def test_entries_are_matched_to_their_own_install(text, owner, expected):
+    assert autostart.points_to(text, owner) is expected
+
+
+def test_disabling_leaves_another_installs_entry_alone(monkeypatch, tmp_path):
+    monkeypatch.setattr(autostart, "IS_WINDOWS", False)
+    monkeypatch.setattr(autostart, "IS_MAC", False)
+    monkeypatch.setattr(autostart, "IS_LINUX", True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    other = autostart.Target(["/opt/other/app/AppRun", "--root", "/opt/other", "--hidden"], "desktop", "/opt/other")
+    autostart.set_enabled(True, other)
+    autostart.set_enabled(False, None, owner="/opt/mine")
+    assert autostart.is_enabled("/opt/other") and not autostart.is_enabled("/opt/mine")
+    autostart.set_enabled(False, None, owner="/opt/other")
+    assert not autostart.is_enabled()

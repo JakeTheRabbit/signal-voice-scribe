@@ -208,7 +208,7 @@ class ControlService:
 
     def autostart_get(self):
         target = autostart.desktop_target()
-        return {"available": target is not None, "enabled": autostart.is_enabled()}
+        return {"available": target is not None, "enabled": autostart.is_enabled(self.paths.root)}
 
     def autostart_set(self, enabled):
         if type(enabled) is not bool:
@@ -217,7 +217,7 @@ class ControlService:
         if target is None:
             raise ControlFailure("autostart_unavailable", "Start at login is only available in the desktop app")
         try:
-            autostart.set_enabled(enabled, target)
+            autostart.set_enabled(enabled, target, owner=self.paths.root)
         except OSError as exc:
             raise ControlFailure("autostart_failed", "Start at login could not be changed") from exc
-        return {"available": True, "enabled": autostart.is_enabled()}
+        return {"available": True, "enabled": autostart.is_enabled(self.paths.root)}

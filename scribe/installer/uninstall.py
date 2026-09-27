@@ -28,7 +28,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     paths = resolve()
 
-    set_enabled(False, None)
+    set_enabled(False, None, owner=paths.root)  # never another install's entry
     print("Start at login: removed")
     desktop.remove_launchers(paths)
     print("Shortcuts: removed")

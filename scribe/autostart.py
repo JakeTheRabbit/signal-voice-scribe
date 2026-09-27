@@ -1,8 +1,14 @@
-"""Start at login: the desktop app (in the tray) or, on servers, the headless engine."""
+"""Start at login: the desktop app (in the tray) or, on servers, the headless engine.
+
+Entries have fixed names, so two installs on one computer would share them.
+Checking and removing therefore only count an entry that points at *this*
+install folder (``owner``); another install's entry is left alone.
+"""
 from __future__ import annotations
 
 import os
 import plistlib
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
@@ -69,27 +75,60 @@ def windows_command(command: list[str]) -> str:
     return subprocess.list2cmdline(command)
 
 
-def is_enabled() -> bool:
+def points_to(text: str | None, owner: Path | str | None) -> bool:
+    """True if an entry's command mentions the ``owner`` install folder (or no owner is given).
+
+    The folder must end at a separator, quote, space or the end, so ``/apps/scribe`` never
+    matches an entry for ``/apps/scribe-2``.
+    """
+    if text is None:
+        return False
+    if owner is None:
+        return True
+    folder = re.escape(os.path.normcase(str(owner)).rstrip("\\/"))
+    return re.search(folder + r"""(?=[\\/"' ]|$)""", os.path.normcase(text)) is not None
+
+
+def _read(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
+def _windows_entry() -> str | None:
+    import winreg
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            return str(winreg.QueryValueEx(key, RUN_VALUE)[0])
+    except OSError:
+        return None
+
+
+def _mac_entry() -> str | None:
+    try:
+        with open(_launch_agent(), "rb") as handle:
+            return " ".join(plistlib.load(handle).get("ProgramArguments", []))
+    except (OSError, ValueError):
+        return None
+
+
+def is_enabled(owner: Path | str | None = None) -> bool:
     if IS_WINDOWS:
-        import winreg
-        try:
-            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
-                winreg.QueryValueEx(key, RUN_VALUE)
-            return True
-        except OSError:
-            return False
+        return points_to(_windows_entry(), owner)
     if IS_MAC:
-        return _launch_agent().exists()
-    return _xdg_autostart().exists() or _systemd_unit().exists()
+        return points_to(_mac_entry(), owner)
+    return points_to(_read(_xdg_autostart()), owner) or points_to(_read(_systemd_unit()), owner)
 
 
-def set_enabled(enabled: bool, target: Target | None) -> None:
+def set_enabled(enabled: bool, target: Target | None, owner: Path | str | None = None) -> None:
+    """Enable ``target``, or disable the entry (only if it belongs to ``owner``)."""
     if IS_WINDOWS:
         import winreg
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as key:
             if enabled and target:
                 winreg.SetValueEx(key, RUN_VALUE, 0, winreg.REG_SZ, windows_command(target.command))
-            else:
+            elif points_to(_windows_entry(), owner):
                 try:
                     winreg.DeleteValue(key, RUN_VALUE)
                 except OSError:
@@ -98,7 +137,8 @@ def set_enabled(enabled: bool, target: Target | None) -> None:
     if IS_MAC:
         agent = _launch_agent()
         if not enabled or not target:
-            agent.unlink(missing_ok=True)
+            if points_to(_mac_entry(), owner):
+                agent.unlink(missing_ok=True)
             return
         agent.parent.mkdir(parents=True, exist_ok=True)
         plist = {"Label": LAUNCH_AGENT, "ProgramArguments": target.command, "RunAtLoad": True,
@@ -110,15 +150,16 @@ def set_enabled(enabled: bool, target: Target | None) -> None:
             plistlib.dump(plist, handle)
         return
     if IS_LINUX:
-        _set_linux(enabled, target)
+        _set_linux(enabled, target, owner)
 
 
-def _set_linux(enabled: bool, target: Target | None) -> None:
+def _set_linux(enabled: bool, target: Target | None, owner: Path | str | None) -> None:
     entry, unit = _xdg_autostart(), _systemd_unit()
     systemctl = shutil.which("systemctl")
     if not enabled or not target:
-        entry.unlink(missing_ok=True)
-        if unit.exists():
+        if points_to(_read(entry), owner):
+            entry.unlink(missing_ok=True)
+        if points_to(_read(unit), owner):
             if systemctl:
                 subprocess.run([systemctl, "--user", "disable", "--now", SYSTEMD_UNIT], capture_output=True)
             unit.unlink(missing_ok=True)

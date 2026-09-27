@@ -200,10 +200,37 @@ def add_launchers(paths: Paths, desktop_icon: bool = True) -> list[Path]:
     return created
 
 
+def _shortcut_command(link: Path) -> str | None:
+    """Target and arguments of a Windows shortcut."""
+    script = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut($env:SS_LINK);"
+              "[Console]::Out.Write($s.TargetPath + ' ' + $s.Arguments)")
+    try:
+        result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                                env={**os.environ, "SS_LINK": str(link)}, capture_output=True,
+                                text=True, timeout=30, creationflags=0x08000000)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
 def remove_launchers(paths: Paths) -> None:
+    """Remove this install's shortcuts, never another install's with the same name."""
+    from ..autostart import points_to
     if IS_WINDOWS:
         for folder in windows_shortcut_folders(True):
-            (folder / f"{APP_NAME}.lnk").unlink(missing_ok=True)
+            link = folder / f"{APP_NAME}.lnk"
+            if link.exists() and points_to(_shortcut_command(link), paths.root):
+                link.unlink(missing_ok=True)
     elif IS_LINUX:
-        linux_entry().unlink(missing_ok=True)
-    pointer_file().unlink(missing_ok=True)
+        entry = linux_entry()
+        try:
+            if points_to(entry.read_text(encoding="utf-8"), paths.root):
+                entry.unlink()
+        except OSError:
+            pass
+    pointer = pointer_file()
+    try:
+        if pointer.read_text(encoding="utf-8").strip() == str(paths.root):
+            pointer.unlink()
+    except OSError:
+        pass
