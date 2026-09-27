@@ -1,0 +1,38 @@
+name: Something isn't working
+description: A voice note wasn't transcribed, the installer failed, or the app misbehaves.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Please don't paste transcripts, phone numbers, names or QR codes.** Logs from Signal Scribe
+        itself contain none of these, but `signal-cli.log` can include phone numbers, so check it first.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 11, Windows 10, macOS (Apple silicon), macOS (Intel), Linux (desktop), Linux (headless / Docker)]
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Signal Scribe version
+      placeholder: "1.0.0 (App page, or `signal-scribe --version`)"
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of Diagnostics → Copy results (or `signal-scribe doctor`)
+      render: text
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant lines from logs/engine.log
+      description: Diagnostics → Open logs folder.
+      render: text

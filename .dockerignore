@@ -1,0 +1,11 @@
+.git
+.venv
+runtime
+data
+logs
+models
+config.json
+desktop
+docs
+tests
+*.log

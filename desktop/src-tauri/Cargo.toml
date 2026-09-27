@@ -1,0 +1,33 @@
+[package]
+name = "signal-scribe"
+version = "1.0.0"
+description = "Read your Signal voice notes instead of listening to them"
+authors = ["Signal Scribe contributors"]
+license = "MIT"
+repository = "https://github.com/JakeTheRabbit/signal-voice-scribe"
+edition = "2024"
+
+[lib]
+name = "signal_scribe_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.6.3", features = [] }
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+tauri = { version = "=2.11.5", features = ["tray-icon", "image-png"] }
+tauri-plugin-dialog = "=2.7.2"
+tauri-plugin-single-instance = "=2.4.3"
+thiserror = "2.0.17"
+
+[target.'cfg(windows)'.dependencies]
+dunce = "1.0.5"
+windows-sys = { version = "0.60.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading", "Win32_System_Diagnostics_ToolHelp"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3.23.0"

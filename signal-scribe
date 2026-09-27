@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Signal Scribe command line (macOS/Linux). Try: ./signal-scribe --help
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+exec "$ROOT/.venv/bin/python" -m scribe.cli "$@"

@@ -1,0 +1,88 @@
+name: Install on a clean machine
+
+# Runs the real installers the way a user would (downloads uv, Python, Java,
+# signal-cli and a small Whisper model), then transcribes a test voice note.
+# Scheduled weekly so upstream changes (signal-cli, Java, model hosting) are caught.
+on:
+  push:
+    branches: [main]
+    paths: ["install.sh", "install.ps1", "pyproject.toml", "uv.lock", "scribe/**", ".github/workflows/install.yml"]
+  pull_request:
+    paths: ["install.sh", "install.ps1", "pyproject.toml", "uv.lock", "scribe/**", ".github/workflows/install.yml"]
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    name: install.sh (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Hide the runner's own uv, Python and Java
+        run: |
+          echo "PATH=/usr/bin:/bin:/usr/sbin:/sbin" >> "$GITHUB_ENV"
+          echo "JAVA_HOME=" >> "$GITHUB_ENV"
+      - name: Install (headless, tiny model)
+        run: ./install.sh --headless --model tiny.en --no-autostart --no-launch
+      - name: Doctor
+        run: ./signal-scribe doctor
+      - name: Transcribe the test voice note
+        run: |
+          ./signal-scribe transcribe tests/fixtures/voice-note.m4a | tee transcript.txt
+          grep -qi "minutes late" transcript.txt
+      - name: Engine refuses to run before linking (exit code 2)
+        run: |
+          set +e
+          ./signal-scribe run; code=$?
+          test "$code" = 2
+      - name: Installer is safe to run again
+        run: ./install.sh --headless --model none --no-autostart --no-launch
+      - name: Uninstall keeps data unless asked
+        run: |
+          ./uninstall.sh
+          test -f config.json
+
+  windows:
+    name: install.ps1 (windows-latest)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install (headless, tiny model) with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          Remove-Item Env:JAVA_HOME -ErrorAction SilentlyContinue
+          .\install.ps1 -Headless -Model tiny.en -NoAutostart -NoLaunch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Doctor
+        shell: cmd
+        run: signal-scribe.cmd doctor
+      - name: Transcribe the test voice note
+        shell: pwsh
+        run: |
+          $text = & .\signal-scribe.cmd transcribe tests\fixtures\voice-note.m4a
+          $text
+          if ($text -notmatch "minutes late") { exit 1 }
+      - name: Engine refuses to run before linking (exit code 2)
+        shell: pwsh
+        run: |
+          & .\signal-scribe.cmd run
+          if ($LASTEXITCODE -ne 2) { exit 1 } else { exit 0 }
+      - name: Installer is safe to run again
+        shell: powershell
+        run: |
+          .\install.ps1 -Headless -Model none -NoAutostart -NoLaunch
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -1,0 +1,12 @@
+# Normalise line endings: LF in the repository and on macOS/Linux checkouts.
+* text=auto eol=lf
+# Windows-only scripts keep CRLF.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+# Binary files.
+*.png binary
+*.ico binary
+*.icns binary
+*.m4a binary
+*.wav binary

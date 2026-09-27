@@ -1,0 +1,15 @@
+# Headless Signal Scribe. First link it:  docker compose run --rm signal-scribe link
+# Then start it:                          docker compose up -d
+services:
+  signal-scribe:
+    build: .
+    image: signal-scribe:local
+    restart: unless-stopped
+    # Give a transcription in progress time to finish cleanly.
+    stop_grace_period: 30s
+    volumes:
+      # Your Signal keys, settings, history and the speech model live here. Back it up.
+      - ./signal-scribe-data:/data
+    environment:
+      # Set your time zone so late voice notes show the time they were sent.
+      TZ: Etc/UTC

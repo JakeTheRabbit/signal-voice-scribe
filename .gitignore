@@ -1,0 +1,37 @@
+# Your data: Signal keys, settings, history, logs and downloaded models.
+config.json
+config.json.*
+data/
+logs/
+models/
+
+# Downloaded by the installer.
+runtime/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# Desktop app build output
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/*.tsbuildinfo
+desktop/vite.config.js
+desktop/vite.config.d.ts
+
+# Crash dumps from the Java runtime
+hs_err_pid*.log
+replay_pid*.log
+
+# Editors and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

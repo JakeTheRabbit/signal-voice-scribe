@@ -1,0 +1,20 @@
+name: Idea or improvement
+description: Suggest something that would make Signal Scribe more useful.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do that you can't today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could Signal Scribe help?
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This keeps audio and transcripts on my own computer (Signal Scribe doesn't add cloud services).

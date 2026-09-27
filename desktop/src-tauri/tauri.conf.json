@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Signal Scribe",
+  "mainBinaryName": "signal-scribe",
+  "version": "1.0.0",
+  "identifier": "io.github.jaketherabbit.signalscribe",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Signal Scribe",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 920,
+        "minHeight": 640,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: data:; media-src 'self' data:; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "Utility",
+    "shortDescription": "Read your Signal voice notes instead of listening to them",
+    "longDescription": "Signal Scribe links to your Signal account as a desktop device and turns voice notes into text on your own computer.",
+    "copyright": "Copyright (c) 2026 Signal Scribe contributors",
+    "license": "MIT",
+    "homepage": "https://github.com/JakeTheRabbit/signal-voice-scribe",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "11.0"
+    },
+    "linux": {
+      "appimage": { "bundleMediaFramework": false }
+    }
+  }
+}
