@@ -77,7 +77,9 @@ def run(paths: Paths) -> list[Check]:
     if heartbeat is None or heartbeat.get("stale") or heartbeat.get("state") == "stopped":
         add("Engine", WARNING, "Not running")
     elif heartbeat.get("state") == "needs_attention":
-        add("Engine", ERROR, heartbeat.get("detail") or "Needs attention")
+        # Not being linked yet is expected after installing; the Signal link check says what to do.
+        add("Engine", WARNING if heartbeat.get("problem") == "not_linked" else ERROR,
+            heartbeat.get("detail") or "Needs attention")
     else:
         pending = (heartbeat.get("queue") or {}).get("pending")
         add("Engine", OK, f"{heartbeat.get('detail', 'Running')}"

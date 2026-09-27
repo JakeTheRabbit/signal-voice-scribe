@@ -109,3 +109,14 @@ def test_internal_errors_are_generic(service, monkeypatch):
 def test_saved_defaults_validate(paths):
     config.save(paths.config, config.defaults())
     assert ControlService(paths).dispatch("config.get") == config.defaults()
+
+
+def test_an_engine_waiting_for_a_link_is_not_an_error(paths):
+    from scribe import doctor
+    from scribe.status import StatusFile
+    StatusFile(paths.status_file).update(state="needs_attention", problem="not_linked", detail="Link first")
+    engine = next(check for check in doctor.run(paths) if check.name == "Engine")
+    assert engine.status == "warning"
+    StatusFile(paths.status_file).update(state="needs_attention", problem="unlinked", detail="Link again")
+    engine = next(check for check in doctor.run(paths) if check.name == "Engine")
+    assert engine.status == "error"

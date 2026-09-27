@@ -116,11 +116,13 @@ def main(argv=None) -> int:
 
         step(6, total, "Checking the install")
         checks = doctor.run(paths)
+        installed = ("Java", "signal-cli", "Whisper model", "Settings")
         for check in checks:
-            if check.name in ("Java", "signal-cli", "Whisper model", "Settings", "Signal link"):
+            if check.name in installed + ("Signal link",):
                 label = {"ok": "OK  ", "warning": "WARN", "error": "FAIL"}.get(check.status, check.status)
                 say(f"[{label}] {check.name}: {check.detail}")
-        if any(check.status == "error" for check in checks if check.name != "Signal link"):
+        # Only what the installer installs can fail it; linking and the engine come later.
+        if any(check.status == "error" for check in checks if check.name in installed):
             print("\nSome checks failed. See the messages above, then run the installer again.")
             return 1
     except KeyboardInterrupt:
