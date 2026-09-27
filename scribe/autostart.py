@@ -164,6 +164,7 @@ def _set_linux(enabled: bool, target: Target | None, owner: Path | str | None) -
                 subprocess.run([systemctl, "--user", "disable", "--now", SYSTEMD_UNIT], capture_output=True)
             unit.unlink(missing_ok=True)
         return
+    _set_linux(False, None, target.workdir)  # switching desktop <-> headless: drop the other entry
     if target.kind == "engine" and systemctl:
         unit.parent.mkdir(parents=True, exist_ok=True)
         unit.write_text(

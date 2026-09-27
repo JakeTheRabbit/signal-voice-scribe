@@ -99,11 +99,18 @@ def main(argv=None) -> int:
                 else:
                     exe = desktop.install_file(Path(args.desktop).resolve(), paths)
                 say(f"Desktop app installed: {exe}")
-                if not args.no_shortcuts:
-                    for link in desktop.add_launchers(paths, desktop_icon=not args.no_desktop_icon):
-                        say(f"Shortcut: {link}")
-                target = Target(desktop.launch_command(paths, hidden=True), "desktop", str(paths.root))
-                launch = desktop.launch_command(paths)
+                missing = desktop.missing_libraries(paths)
+                if missing:
+                    say("It can't start yet: this computer is missing " + ", ".join(missing) + ".")
+                    say("Install them (docs/troubleshooting.md has the command), then run the installer again.")
+                    say("Continuing in headless mode for now.")
+                    target = engine_target(paths)
+                else:
+                    if not args.no_shortcuts:
+                        for link in desktop.add_launchers(paths, desktop_icon=not args.no_desktop_icon):
+                            say(f"Shortcut: {link}")
+                    target = Target(desktop.launch_command(paths, hidden=True), "desktop", str(paths.root))
+                    launch = desktop.launch_command(paths)
             except (DownloadError, OSError, subprocess.CalledProcessError) as exc:
                 say(f"The desktop app could not be installed ({exc}).")
                 say("Continuing in headless mode. Re-run with --desktop build to build it from source.")

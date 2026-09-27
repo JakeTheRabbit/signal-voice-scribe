@@ -101,8 +101,10 @@ cd signal-voice-scribe
 ```
 
 macOS puts **Signal Scribe** in the Applications folder inside your home folder; Linux adds it to
-your app menu. On
-GNOME, the tray icon needs the AppIndicator extension (`gnome-shell-extension-appindicator`).
+your app menu. On GNOME, the tray icon needs the AppIndicator extension
+(`gnome-shell-extension-appindicator`). On a minimal Linux install that lacks a desktop's graphics
+libraries, the installer lists what to add
+([troubleshooting](docs/troubleshooting.md#linux-the-app-doesnt-open-missing-libeglso1-or-similar)).
 
 ### Home server or NAS (headless)
 

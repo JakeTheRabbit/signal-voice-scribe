@@ -1,13 +1,18 @@
 import hashlib
 import io
+import json
 import tarfile
+import tomllib
 import zipfile
+from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from scribe import autostart
+from scribe import __version__, autostart
 from scribe.installer import desktop, fetch, runtime
 from scribe.installer.fetch import DownloadError
+from scribe.paths import Paths
 
 
 def file_url(path):
@@ -81,6 +86,21 @@ def test_platform_names_for_downloads(monkeypatch, system, machine, expected):
     assert runtime.machine() == expected
 
 
+def test_versions_match_everywhere():
+    """The installer downloads the desktop app built for __version__, so every manifest must agree."""
+    root = Path(__file__).resolve().parents[1]
+    versions = {
+        "pyproject.toml": tomllib.loads((root / "pyproject.toml").read_text("utf-8"))["project"]["version"],
+        "package.json": json.loads((root / "desktop" / "package.json").read_text("utf-8"))["version"],
+        "tauri.conf.json": json.loads(
+            (root / "desktop" / "src-tauri" / "tauri.conf.json").read_text("utf-8"))["version"],
+        "Cargo.toml": tomllib.loads(
+            (root / "desktop" / "src-tauri" / "Cargo.toml").read_text("utf-8"))["package"]["version"],
+    }
+    assert set(versions.values()) == {__version__}, versions
+    assert f"## [{__version__}]" in (root / "CHANGELOG.md").read_text("utf-8")
+
+
 def test_release_assets_exist_for_supported_platforms(monkeypatch):
     for system, machine, asset in (("win", "AMD64", "signal-scribe-windows-x64.exe"),
                                    ("mac", "arm64", "signal-scribe-macos-universal.app.tar.gz"),
@@ -139,6 +159,58 @@ def test_mac_launch_agent(monkeypatch, tmp_path):
 ])
 def test_entries_are_matched_to_their_own_install(text, owner, expected):
     assert autostart.points_to(text, owner) is expected
+
+
+def test_switching_between_desktop_and_headless_keeps_one_entry(monkeypatch, tmp_path):
+    monkeypatch.setattr(autostart, "IS_WINDOWS", False)
+    monkeypatch.setattr(autostart, "IS_MAC", False)
+    monkeypatch.setattr(autostart, "IS_LINUX", True)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr(autostart.shutil, "which", lambda name: "/usr/bin/systemctl")
+    calls = []
+    monkeypatch.setattr(autostart.subprocess, "run", lambda args, **kwargs: calls.append(args[1:]))
+    entry = tmp_path / "autostart" / "signal-scribe.desktop"
+    unit = tmp_path / "systemd" / "user" / autostart.SYSTEMD_UNIT
+    engine = autostart.Target(["/opt/app/.venv/bin/python", "/opt/app/transcriber.py"], "engine", "/opt/app")
+    window = autostart.Target(["/opt/app/runtime/desktop/app/AppRun", "--root", "/opt/app", "--hidden"],
+                              "desktop", "/opt/app")
+    autostart.set_enabled(True, engine)
+    assert unit.exists() and not entry.exists()
+    autostart.set_enabled(True, window)
+    assert entry.exists() and not unit.exists()
+    assert ["--user", "disable", "--now", autostart.SYSTEMD_UNIT] in calls
+    autostart.set_enabled(True, engine)
+    assert unit.exists() and not entry.exists()
+
+
+def test_missing_linux_libraries_are_listed(monkeypatch, tmp_path):
+    paths = Paths(tmp_path, tmp_path)
+    monkeypatch.setattr(desktop, "IS_WINDOWS", False)
+    monkeypatch.setattr(desktop, "IS_MAC", False)
+    monkeypatch.setattr(desktop, "IS_LINUX", True)
+    binary = desktop.app_location(paths) / "usr" / "bin" / "signal-scribe"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"\x7fELF")
+    monkeypatch.setattr(desktop.shutil, "which", lambda name: "/usr/bin/ldd")
+    seen = {}
+
+    def fake_ldd(args, env, **kwargs):
+        seen["library_path"] = env["LD_LIBRARY_PATH"]
+        return SimpleNamespace(stdout="\tlinux-vdso.so.1 (0x00007ffd)\n"
+                                      "\tlibgtk-3.so.0 => /opt/app/usr/lib/libgtk-3.so.0 (0x7f00)\n"
+                                      "\tlibgbm.so.1 => not found\n\tlibEGL.so.1 => not found\n"
+                                      "\tlibEGL.so.1 => not found\n")
+    monkeypatch.setattr(desktop.subprocess, "run", fake_ldd)
+    monkeypatch.setattr(desktop.ctypes, "CDLL", lambda name: None)
+    assert desktop.missing_libraries(paths) == ["libEGL.so.1", "libgbm.so.1"]
+    assert seen["library_path"] == str(desktop.app_location(paths) / "usr" / "lib")
+
+    def no_library(name):
+        raise OSError(name)
+    monkeypatch.setattr(desktop.ctypes, "CDLL", no_library)
+    assert "libGLESv2.so.2" in desktop.missing_libraries(paths)
+    monkeypatch.setattr(desktop, "IS_LINUX", False)
+    assert desktop.missing_libraries(paths) == []
 
 
 def test_disabling_leaves_another_installs_entry_alone(monkeypatch, tmp_path):

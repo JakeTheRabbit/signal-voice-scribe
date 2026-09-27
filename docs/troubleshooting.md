@@ -59,6 +59,20 @@ notes.
 GNOME needs the AppIndicator extension: install `gnome-shell-extension-appindicator` (or your
 distribution's equivalent) and log out and in again. The window still works without it.
 
+## Linux: the app doesn't open ("missing libEGL.so.1" or similar)
+
+The Linux app uses your system's graphics, X11 and font libraries. Every desktop has them, but a
+minimal install may not; the installer then names the missing ones and sets up headless mode for
+now. On Debian or Ubuntu, install them with:
+
+```bash
+sudo apt install libegl1 libgl1 libgles2 libgbm1 libdrm2 libx11-6 libx11-xcb1 libxcb1 libfontconfig1 libfreetype6 libfribidi0 libharfbuzz0b libexpat1
+```
+
+On other distributions, look up the package that provides a missing file, for example
+`dnf provides '*/libEGL.so.1'` (Fedora) or `pacman -F libEGL.so.1` (Arch, after `sudo pacman -Fy`).
+Then run the installer again; it switches back to the desktop app.
+
 ## macOS: "Signal Scribe can't be opened"
 
 The installer downloads the app in a way that normally avoids this. If you downloaded the app

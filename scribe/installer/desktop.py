@@ -1,6 +1,7 @@
 """The desktop app (window + tray): download the matching release build and add launchers."""
 from __future__ import annotations
 
+import ctypes
 import os
 import shutil
 import stat
@@ -55,6 +56,30 @@ def executable(paths: Paths) -> Path:
     if IS_LINUX:
         return location / "AppRun" if (location / "AppRun").exists() else location / "signal-scribe"
     return location
+
+
+def missing_libraries(paths: Paths) -> list[str]:
+    """Linux: system libraries the unpacked app needs but this computer doesn't have.
+
+    AppImages leave out graphics, X11 and font libraries on purpose (they must match
+    the computer). Desktops always have them; minimal installs may not.
+    """
+    binary = app_location(paths) / "usr" / "bin" / "signal-scribe"
+    ldd = shutil.which("ldd")
+    if not IS_LINUX or not ldd or not binary.is_file():
+        return []
+    env = {**os.environ, "LD_LIBRARY_PATH": str(binary.parents[1] / "lib")}
+    try:
+        output = subprocess.run([ldd, str(binary)], env=env, capture_output=True, text=True,
+                                timeout=60).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    missing = {line.split()[0] for line in output.splitlines() if "=> not found" in line}
+    try:
+        ctypes.CDLL("libGLESv2.so.2")  # WebKitGTK loads it at run time, so ldd can't see it
+    except OSError:
+        missing.add("libGLESv2.so.2")
+    return sorted(missing)
 
 
 def launch_command(paths: Paths, hidden: bool = False) -> list[str]:
